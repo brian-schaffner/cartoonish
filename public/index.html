@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cartoonish Caricatures</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>Cartoonish Caricatures</h1>
+    <p>Summon playful cartoon caricatures of real or fictional personalities using DALL·E.</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <form id="caricature-form">
+        <label for="names">Enter one or more names (comma or line separated):</label>
+        <textarea id="names" name="names" rows="4" placeholder="e.g. Albert Einstein, Wonder Woman"></textarea>
+        <button type="submit">Generate caricatures</button>
+      </form>
+      <p class="hint">Images are generated sequentially. Progress will appear below.</p>
+      <div id="error" role="alert" class="hidden"></div>
+    </section>
+
+    <section id="results" aria-live="polite" class="grid"></section>
+  </main>
+
+  <template id="card-template">
+    <article class="card">
+      <div class="placeholder">
+        <span class="status">Working…</span>
+      </div>
+      <h2 class="name"></h2>
+      <p class="prompt hidden"></p>
+    </article>
+  </template>
+
+  <script src="script.js" type="module"></script>
+</body>
+</html>

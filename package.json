@@ -1,0 +1,23 @@
+{
+  "name": "cartoonish",
+  "version": "1.0.0",
+  "description": "Cartoon caricature generator web app",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "keywords": [
+    "dall-e",
+    "openai",
+    "caricature"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "openai": "^5.21.0"
+  }
+}
