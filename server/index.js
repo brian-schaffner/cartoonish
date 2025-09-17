@@ -1,5 +1,13 @@
-require('dotenv').config();
 const path = require('path');
+const dotenv = require('dotenv');
+
+const envPath = path.resolve(__dirname, '..', '.env');
+const envResult = dotenv.config({ path: envPath });
+
+if (envResult.error && envResult.error.code !== 'ENOENT') {
+  console.error('Failed to load environment variables from .env file.', envResult.error);
+}
+
 const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
