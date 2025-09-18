@@ -28,6 +28,32 @@ body {
   color: rgba(20, 33, 70, 0.75);
 }
 
+.api-status {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  display: inline-block;
+  font-size: 0.9rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.api-status.success {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.3);
+  color: #2e7d32;
+}
+
+.api-status.error {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #c62828;
+}
+
+.status-indicator {
+  margin-right: 0.5rem;
+}
+
 main {
   max-width: 1100px;
   margin: 0 auto;

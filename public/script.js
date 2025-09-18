@@ -3,6 +3,35 @@ const textarea = document.getElementById('names');
 const results = document.getElementById('results');
 const errorBox = document.getElementById('error');
 const cardTemplate = document.getElementById('card-template');
+const apiStatus = document.getElementById('api-status');
+
+// Check API configuration on page load
+async function checkApiStatus() {
+  try {
+    const response = await fetch('/api/info');
+    const info = await response.json();
+    
+    const statusIndicator = apiStatus.querySelector('.status-indicator');
+    const statusText = apiStatus.querySelector('.status-text');
+    
+    if (info.apiKeyConfigured) {
+      apiStatus.className = 'api-status success';
+      statusIndicator.textContent = '✅';
+      statusText.textContent = `API Key: ...${info.apiKeyLast4}${info.orgIdConfigured ? ` | Org: ${info.orgId}` : ''}`;
+    } else {
+      apiStatus.className = 'api-status error';
+      statusIndicator.textContent = '❌';
+      statusText.textContent = 'API Key not configured';
+    }
+  } catch (error) {
+    apiStatus.className = 'api-status error';
+    apiStatus.querySelector('.status-indicator').textContent = '❌';
+    apiStatus.querySelector('.status-text').textContent = 'Failed to check API status';
+  }
+}
+
+// Initialize API status check
+checkApiStatus();
 
 function parseNames(value) {
   if (!value) return [];

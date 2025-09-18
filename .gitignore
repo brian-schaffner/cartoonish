@@ -78,3 +78,18 @@ jspm_packages/
 # Test files (temporary)
 test-*.js
 demo-*.js
+proof-image-*.png
+einstein-caricature-proof.png
+cli-generator.js
+generate-personalities.js
+generate-personalities-styled.js
+test-openai.js
+test-final.js
+test-prompt-difference.js
+test-multiple-images.js
+keep-server-running.sh
+personalities/
+
+# Reference images and temp files
+temp/
+*.tmp

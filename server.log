@@ -1,0 +1,106 @@
+[dotenv@17.2.2] injecting env (3) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+Cartoonish server listening on http://localhost:3000
+Image generation failed BadRequestError: 400 Billing hard limit has been reached
+    at APIError.generate (/Users/brian/dev/cartoonish/cartoonish/node_modules/openai/core/error.js:45:20)
+    at OpenAI.makeStatusError (/Users/brian/dev/cartoonish/cartoonish/node_modules/openai/client.js:163:32)
+    at OpenAI.makeRequest (/Users/brian/dev/cartoonish/cartoonish/node_modules/openai/client.js:331:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async generateCaricature (/Users/brian/dev/cartoonish/cartoonish/server/index.js:35:20)
+    at async /Users/brian/dev/cartoonish/cartoonish/server/index.js:76:26 {
+  status: 400,
+  headers: HeadersList {
+    cookies: [
+      '__cf_bm=Bj7hQAnsK2dCafVB..a8UikKj9w6YvBAZVwJGzePGk4-1758151890-1.0.1.1-h4h70QvWIw2W1sJ6vbzv1J03SVTgX5o8xx2Cckf4aoXHdhnQdoEhidfSWjHVYu2mokw.yakQQuW6.L3PRFfPRLzRxQuA6a9BZ1O._qNgA9s; path=/; expires=Thu, 18-Sep-25 00:01:30 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None',
+      '_cfuvid=1ES8aoKn2hTSkSVZ4tAY0emhoVLQZLyEMuwQGVSYkSM-1758151890477-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None'
+    ],
+    [Symbol(headers map)]: Map(17) {
+      'date' => [Object],
+      'content-type' => [Object],
+      'content-length' => [Object],
+      'connection' => [Object],
+      'openai-version' => [Object],
+      'openai-organization' => [Object],
+      'openai-project' => [Object],
+      'x-request-id' => [Object],
+      'openai-processing-ms' => [Object],
+      'x-envoy-upstream-service-time' => [Object],
+      'strict-transport-security' => [Object],
+      'cf-cache-status' => [Object],
+      'set-cookie' => [Object],
+      'x-content-type-options' => [Object],
+      'server' => [Object],
+      'cf-ray' => [Object],
+      'alt-svc' => [Object]
+    },
+    [Symbol(headers map sorted)]: [
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array]
+    ]
+  },
+  requestID: 'req_10ab1cb173c2ae8a556b3d7043d24218',
+  error: {
+    message: 'Billing hard limit has been reached',
+    type: 'image_generation_user_error',
+    param: null,
+    code: 'billing_hard_limit_reached'
+  },
+  code: 'billing_hard_limit_reached',
+  param: null,
+  type: 'image_generation_user_error'
+}
+Image generation failed BadRequestError: 400 Billing hard limit has been reached
+    at APIError.generate (/Users/brian/dev/cartoonish/cartoonish/node_modules/openai/core/error.js:45:20)
+    at OpenAI.makeStatusError (/Users/brian/dev/cartoonish/cartoonish/node_modules/openai/client.js:163:32)
+    at OpenAI.makeRequest (/Users/brian/dev/cartoonish/cartoonish/node_modules/openai/client.js:331:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async generateCaricature (/Users/brian/dev/cartoonish/cartoonish/server/index.js:35:20)
+    at async /Users/brian/dev/cartoonish/cartoonish/server/index.js:76:26 {
+  status: 400,
+  headers: HeadersList {
+    cookies: [
+      '__cf_bm=A5MpJSZpG7duY5rgASe3gHEBw9i7DOYxFqOPP9vYs94-1758151894-1.0.1.1-0LbW3p0AKgcPOLj5W84h1Pzd4mSeQ5lYJgpGdZZZ8ilTepd_S9zAAZHXiKF2C7Hv3WltvwqT4Z1hQqTElxcAcQRdWCu1rYPQW5yklxN_y8Q; path=/; expires=Thu, 18-Sep-25 00:01:34 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None',
+      '_cfuvid=KK8w6tsdaUoZjLGM3_AWBuojh6LgFGnDyd3N__5P4.Q-1758151894831-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None'
+    ],
+    [Symbol(headers map)]: Map(17) {
+      'date' => [Object],
+      'content-type' => [Object],
+      'content-length' => [Object],
+      'connection' => [Object],
+      'openai-version' => [Object],
+      'openai-organization' => [Object],
+      'openai-project' => [Object],
+      'x-request-id' => [Object],
+      'openai-processing-ms' => [Object],
+      'x-envoy-upstream-service-time' => [Object],
+      'strict-transport-security' => [Object],
+      'cf-cache-status' => [Object],
+      'set-cookie' => [Object],
+      'x-content-type-options' => [Object],
+      'server' => [Object],
+      'cf-ray' => [Object],
+      'alt-svc' => [Object]
+    },
+    [Symbol(headers map sorted)]: [
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array],
+      [Array], [Array], [Array]
+    ]
+  },
+  requestID: 'req_faa4d14b516ff34691ff5a0e1ff8d71b',
+  error: {
+    message: 'Billing hard limit has been reached',
+    type: 'image_generation_user_error',
+    param: null,
+    code: 'billing_hard_limit_reached'
+  },
+  code: 'billing_hard_limit_reached',
+  param: null,
+  type: 'image_generation_user_error'
+}
