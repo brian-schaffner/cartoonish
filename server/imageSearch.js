@@ -3,6 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
+const DEFAULT_MAX_RESULTS = 3;
+const DOWNLOAD_TIMEOUT = 15000;
+const GOOGLE_EXTRA_RESULTS = 8;
+const FALLBACK_EXTRA_RESULTS = 6;
+
 class ImageSearchService {
   constructor() {
     // Google Custom Search API (free tier allows 100 queries per day)
@@ -18,6 +23,15 @@ class ImageSearchService {
     this.pexelsApiKey = process.env.PEXELS_API_KEY;
     this.pexelsBaseUrl = 'https://api.pexels.com/v1';
     
+    // Shared HTTP client configuration for downloads
+    this.downloadClient = axios.create({
+      timeout: DOWNLOAD_TIMEOUT,
+      headers: {
+        'User-Agent': 'Cartoonish/1.0 (+https://github.com/cartoonish-app)'
+      },
+      maxContentLength: 1024 * 1024 * 20 // 20MB safeguard
+    });
+
     // Create temp directory for reference images
     this.tempDir = path.join(__dirname, '..', 'temp');
     if (!fs.existsSync(this.tempDir)) {
@@ -25,168 +39,179 @@ class ImageSearchService {
     }
   }
 
-  async searchForPortrait(personName) {
-    console.log(`🔍 Searching for portrait of: ${personName}`);
-    
-    // Try Google Custom Search first (best for celebrities)
+  async searchForPortrait(personName, options = {}) {
+    const trimmedName = typeof personName === 'string' ? personName.trim() : '';
+    if (!trimmedName) {
+      return [];
+    }
+
+    const maxResults = Math.max(1, options.maxResults ?? DEFAULT_MAX_RESULTS);
+    console.log(`🔍 Searching for portrait of: ${trimmedName}`);
+
+    const collected = [];
+
     if (this.googleApiKey && this.googleSearchEngineId) {
       try {
-        const image = await this.searchGoogle(personName);
-        if (image) return image;
+        const googleResults = await this.searchGoogle(trimmedName, maxResults);
+        collected.push(...googleResults);
       } catch (error) {
-        console.log(`Google search failed: ${error.message}`);
+        this.logAxiosError('Google', trimmedName, error);
       }
     }
-    
-    // Try Unsplash as backup
-    if (this.unsplashAccessKey) {
+
+    if (collected.length < maxResults && this.unsplashAccessKey) {
       try {
-        const image = await this.searchUnsplash(personName);
-        if (image) return image;
+        const unsplashResults = await this.searchUnsplash(trimmedName, maxResults - collected.length);
+        collected.push(...unsplashResults);
       } catch (error) {
-        console.log(`Unsplash search failed: ${error.message}`);
+        this.logAxiosError('Unsplash', trimmedName, error);
       }
     }
-    
-    // Try Pexels as final backup
-    if (this.pexelsApiKey) {
+
+    if (collected.length < maxResults && this.pexelsApiKey) {
       try {
-        const image = await this.searchPexels(personName);
-        if (image) return image;
+        const pexelsResults = await this.searchPexels(trimmedName, maxResults - collected.length);
+        collected.push(...pexelsResults);
       } catch (error) {
-        console.log(`Pexels search failed: ${error.message}`);
+        this.logAxiosError('Pexels', trimmedName, error);
       }
     }
-    
-    // If no API keys or all fail, return null
-    console.log(`No reference image found for: ${personName}`);
-    return null;
+
+    if (!collected.length) {
+      console.log(`No reference image found for: ${trimmedName}`);
+    }
+
+    return collected.slice(0, maxResults).map((result, index) => ({
+      ...result,
+      index: index + 1
+    }));
   }
 
-  async searchGoogle(query) {
-    const searchQuery = `${query} portrait professional headshot`;
-    const url = this.googleBaseUrl;
-    
-    const response = await axios.get(url, {
+  async searchGoogle(query, maxResults) {
+    const response = await axios.get(this.googleBaseUrl, {
       params: {
         key: this.googleApiKey,
         cx: this.googleSearchEngineId,
-        q: searchQuery,
+        q: `${query} portrait professional headshot`,
         searchType: 'image',
-        num: 3, // Get top 3 images
-        imgSize: 'medium',
-        imgType: 'photo',
+        num: Math.min(10, maxResults + GOOGLE_EXTRA_RESULTS),
         safe: 'medium'
       }
     });
 
-    if (response.data.items && response.data.items.length > 0) {
-      const images = [];
-      
-      // Download top 3 images
-      for (let i = 0; i < Math.min(3, response.data.items.length); i++) {
-        const image = response.data.items[i];
-        const imageUrl = image.link;
-        const filename = await this.downloadImage(imageUrl, `${query}-${i+1}`, 'google');
-        
-        if (filename) {
-          images.push({
-            url: imageUrl,
-            localPath: filename,
-            source: 'google',
-            description: image.title || image.snippet,
-            index: i + 1
-          });
-        }
-      }
-      
-      return images.length > 0 ? images : null;
+    const items = Array.isArray(response.data?.items) ? response.data.items : [];
+    const results = [];
+
+    for (const item of items) {
+      const imageUrl = item?.link;
+      if (!imageUrl) continue;
+
+      const localPath = await this.downloadImage(imageUrl, `${query}-${results.length + 1}`, 'google');
+      if (!localPath) continue;
+
+      results.push({
+        url: imageUrl,
+        localPath,
+        source: 'google',
+        description: item?.title || item?.snippet || ''
+      });
+
+      if (results.length >= maxResults) break;
     }
-    
-    return null;
+
+    return results;
   }
 
-  async searchUnsplash(query) {
-    const searchQuery = `${query} portrait professional headshot`;
-    const url = `${this.unsplashBaseUrl}/search/photos`;
-    
-    const response = await axios.get(url, {
+  async searchUnsplash(query, remainingSlots) {
+    if (remainingSlots <= 0) return [];
+
+    const response = await axios.get(`${this.unsplashBaseUrl}/search/photos`, {
       headers: {
-        'Authorization': `Client-ID ${this.unsplashAccessKey}`
+        Authorization: `Client-ID ${this.unsplashAccessKey}`
       },
       params: {
-        query: searchQuery,
-        per_page: 10,
+        query: `${query} portrait professional headshot`,
+        per_page: Math.min(remainingSlots + FALLBACK_EXTRA_RESULTS, 30),
         orientation: 'portrait'
       }
     });
 
-    if (response.data.results && response.data.results.length > 0) {
-      const image = response.data.results[0];
-      const imageUrl = image.urls.regular;
-      const filename = await this.downloadImage(imageUrl, query, 'unsplash');
-      return {
+    const photos = Array.isArray(response.data?.results) ? response.data.results : [];
+    const results = [];
+
+    for (const photo of photos) {
+      const imageUrl = photo?.urls?.regular;
+      if (!imageUrl) continue;
+
+      const localPath = await this.downloadImage(imageUrl, `${query}-${results.length + 1}`, 'unsplash');
+      if (!localPath) continue;
+
+      results.push({
         url: imageUrl,
-        localPath: filename,
+        localPath,
         source: 'unsplash',
-        description: image.description || image.alt_description
-      };
+        description: photo?.description || photo?.alt_description || ''
+      });
+
+      if (results.length >= remainingSlots) break;
     }
-    
-    return null;
+
+    return results;
   }
 
-  async searchPexels(query) {
-    const searchQuery = `${query} portrait professional`;
-    const url = `${this.pexelsBaseUrl}/search`;
-    
-    const response = await axios.get(url, {
+  async searchPexels(query, remainingSlots) {
+    if (remainingSlots <= 0) return [];
+
+    const response = await axios.get(`${this.pexelsBaseUrl}/search`, {
       headers: {
-        'Authorization': this.pexelsApiKey
+        Authorization: this.pexelsApiKey
       },
       params: {
-        query: searchQuery,
-        per_page: 10,
+        query: `${query} portrait professional`,
+        per_page: Math.min(remainingSlots + FALLBACK_EXTRA_RESULTS, 30),
         orientation: 'portrait'
       }
     });
 
-    if (response.data.photos && response.data.photos.length > 0) {
-      const photo = response.data.photos[0];
-      const imageUrl = photo.src.medium;
-      const filename = await this.downloadImage(imageUrl, query, 'pexels');
-      return {
+    const photos = Array.isArray(response.data?.photos) ? response.data.photos : [];
+    const results = [];
+
+    for (const photo of photos) {
+      const imageUrl = photo?.src?.medium || photo?.src?.large;
+      if (!imageUrl) continue;
+
+      const localPath = await this.downloadImage(imageUrl, `${query}-${results.length + 1}`, 'pexels');
+      if (!localPath) continue;
+
+      results.push({
         url: imageUrl,
-        localPath: filename,
+        localPath,
         source: 'pexels',
-        description: photo.alt
-      };
+        description: photo?.alt || photo?.photographer || ''
+      });
+
+      if (results.length >= remainingSlots) break;
     }
-    
-    return null;
+
+    return results;
   }
 
   async downloadImage(imageUrl, personName, source) {
     try {
       console.log(`📥 Downloading image from ${source}: ${imageUrl}`);
-      
-      const response = await axios.get(imageUrl, {
-        responseType: 'arraybuffer',
-        timeout: 10000
+
+      const response = await this.downloadClient.get(imageUrl, {
+        responseType: 'arraybuffer'
       });
 
-      // Create filename
-      const timestamp = Date.now();
-      const extension = this.getImageExtension(imageUrl);
-      const filename = `${personName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${source}-${timestamp}${extension}`;
+      const filename = this.buildFilename(personName, source, imageUrl);
       const filepath = path.join(this.tempDir, filename);
 
-      // Process and save image
       const buffer = Buffer.from(response.data);
       await sharp(buffer)
-        .resize(1024, 1024, { 
+        .resize(1024, 1024, {
           fit: 'inside',
-          withoutEnlargement: true 
+          withoutEnlargement: true
         })
         .jpeg({ quality: 90 })
         .toFile(filepath);
@@ -194,8 +219,26 @@ class ImageSearchService {
       console.log(`✅ Downloaded and processed: ${filename}`);
       return filepath;
     } catch (error) {
-      console.error(`❌ Failed to download image: ${error.message}`);
+      this.logAxiosError(`${source} download`, personName, error);
       return null;
+    }
+  }
+
+  buildFilename(personName, source, imageUrl) {
+    const safeName = personName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const timestamp = Date.now();
+    const extension = this.getImageExtension(imageUrl);
+    return `${safeName}-${source}-${timestamp}${extension}`;
+  }
+
+  logAxiosError(provider, personName, error) {
+    if (error?.response) {
+      const { status, data } = error.response;
+      console.log(`${provider} failed for ${personName}: ${status} ${JSON.stringify(data)}`);
+    } else if (error?.request) {
+      console.log(`${provider} failed for ${personName}: no response (${error.message})`);
+    } else if (error) {
+      console.log(`${provider} failed for ${personName}: ${error.message}`);
     }
   }
 
