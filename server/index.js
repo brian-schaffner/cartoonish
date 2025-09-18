@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const dotenv = require('dotenv');
 
 // Try to load .env file if it exists, but don't fail if it doesn't
@@ -42,92 +43,75 @@ async function generateCaricature(name) {
   console.log(`🎨 Generating caricature for: ${name}`);
 
   // First, try to find reference images
-  let referenceImages = null;
+  let referenceImages = [];
   try {
-    referenceImages = await imageSearchService.searchForPortrait(name);
+    referenceImages = await imageSearchService.searchForPortrait(name, { maxResults: 3 });
   } catch (error) {
     console.log(`⚠️ Could not find reference images for ${name}: ${error.message}`);
   }
 
   let response;
-  
-  if (referenceImages && referenceImages.length > 0) {
+  let usedReferenceImages = false;
+  let effectiveReferenceCount = 0;
+  let referenceSource = null;
+
+  const normalizedReferences = Array.isArray(referenceImages) ? referenceImages : [];
+
+  if (normalizedReferences.length > 0) {
     // Use multiple reference images with Judge Judy style
-    console.log(`📸 Using ${referenceImages.length} reference images from: ${referenceImages[0].source}`);
-    
-    const prompt = `Create a caricature in the exact same style as the Judge Judy reference image. Use the provided reference images of ${name} to capture their distinctive features, but render them in the same bold graphic art style with thick dark outlines, limited color palette, and comic book aesthetic as shown in the Judge Judy style reference. Make it recognizable with subtle exaggeration of distinctive features. Professional quality, clean background, suitable for web display.`;
+    const usableReferences = normalizedReferences
+      .map((ref, index) => {
+        if (!ref || !ref.localPath) return null;
 
-    try {
-      // Use style-based prompt with specific person details
-      let personSpecificPrompt = '';
-      
-      // Add specific features for well-known people
-      if (name.toLowerCase().includes('oprah')) {
-        personSpecificPrompt = `Create a caricature of OPRAH WINFREY (the famous talk show host) in the exact same bold graphic art style as Judge Judy Sheindlin's caricature. 
+        const safePath = ref.localPath;
+        if (!fs.existsSync(safePath)) {
+          return null;
+        }
 
-OPRAH'S DISTINCTIVE FEATURES:
-- African American woman with warm, rich skin tone
-- Curly, voluminous hair (often styled in loose curls or waves)
-- Bright, expressive eyes and warm smile
-- Full lips and strong, confident facial features
-- Often wears elegant, professional clothing
+        return {
+          localPath: safePath,
+          source: ref.source || 'unknown',
+          description: ref.description || '',
+          index: ref.index || index + 1
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 3);
 
-STYLE REQUIREMENTS (copy exactly from Judge Judy style):
-- Thick dark outlines defining all features
-- Limited color palette: warm skin tones, dark clothing, bright white accents
-- Comic book aesthetic with cell-shaded shadows
-- Strong facial features with subtle exaggeration
-- Professional quality with clean background
+    const judgeJudyStylePath = path.join(__dirname, '..', 'style-references', 'judge-judy-style-reference.png');
+    const judgeStyleExists = fs.existsSync(judgeJudyStylePath);
 
-The result should look like OPRAH WINFREY but drawn in Judge Judy's exact artistic style.`;
-      } else if (name.toLowerCase().includes('einstein')) {
-        personSpecificPrompt = `Create a caricature of ALBERT EINSTEIN (the famous physicist) in the exact same bold graphic art style as Judge Judy Sheindlin's caricature.
+    if (judgeStyleExists && usableReferences.length > 0) {
+      console.log(`📸 Using ${usableReferences.length} reference images from: ${usableReferences[0].source}`);
 
-EINSTEIN'S DISTINCTIVE FEATURES:
-- Wild, unkempt white hair that sticks out in all directions
-- Prominent mustache
-- Deep-set, intelligent eyes
-- Wrinkled, thoughtful expression
-- Often wears simple, dark clothing
+      const referenceDescriptions = formatReferenceDescriptions(usableReferences);
+      const prompt = buildStylePrompt(name, referenceDescriptions);
 
-STYLE REQUIREMENTS (copy exactly from Judge Judy style):
-- Thick dark outlines defining all features
-- Limited color palette: warm skin tones, dark clothing, bright white accents
-- Comic book aesthetic with cell-shaded shadows
-- Strong facial features with subtle exaggeration
-- Professional quality with clean background
+      try {
+        const uploadImages = [
+          fs.createReadStream(judgeJudyStylePath),
+          ...usableReferences.map(ref => fs.createReadStream(ref.localPath))
+        ];
 
-The result should look like ALBERT EINSTEIN but drawn in Judge Judy's exact artistic style.`;
-      } else {
-        personSpecificPrompt = `Create a caricature of ${name} in the exact same bold graphic art style as Judge Judy Sheindlin's caricature. 
-
-STYLE REQUIREMENTS (copy exactly from Judge Judy style):
-- Thick dark outlines defining all features
-- Limited color palette: warm skin tones, dark clothing, bright white accents
-- Comic book aesthetic with cell-shaded shadows
-- Strong facial features with subtle exaggeration
-- Professional quality with clean background
-
-PERSON SPECIFIC FEATURES for ${name}:
-- Make it clearly recognizable as ${name}, not Judge Judy
-- Use the reference images to capture ${name}'s distinctive facial features, hair, and characteristics
-- Apply the Judge Judy artistic style to ${name}'s actual appearance
-
-The result should look like ${name} but drawn in Judge Judy's exact artistic style.`;
+        response = await openaiClient.images.edit({
+          model: 'gpt-image-1',
+          image: uploadImages,
+          prompt,
+          size: process.env.OPENAI_IMAGE_SIZE || '1024x1024',
+          n: 1,
+          input_fidelity: 'high',
+          background: 'opaque'
+        });
+        usedReferenceImages = true;
+        effectiveReferenceCount = usableReferences.length;
+        const sources = new Set(usableReferences.map((ref) => ref.source || 'unknown'));
+        referenceSource = sources.size === 1 ? [...sources][0] : 'mixed';
+      } catch (error) {
+        console.log(`⚠️ Failed to use reference images, falling back to text-only: ${error.message}`);
+        response = await generateTextOnlyCaricature(name);
       }
-
-      const stylePrompt = personSpecificPrompt;
-
-      response = await openaiClient.images.generate({
-        model: 'dall-e-3',
-        prompt: stylePrompt,
-        size: process.env.OPENAI_IMAGE_SIZE || '1024x1024',
-        n: 1,
-        response_format: 'b64_json'
-      });
-    } catch (error) {
-      console.log(`⚠️ Failed to use reference images, falling back to text-only: ${error.message}`);
-      // Fall back to text-only generation
+    } else {
+      console.log('ℹ️  Missing Judge Judy style reference or usable reference photos. Falling back to text-only generation.');
       response = await generateTextOnlyCaricature(name);
     }
   } else {
@@ -145,14 +129,27 @@ The result should look like ${name} but drawn in Judge Judy's exact artistic sty
     name,
     imageBase64: image.b64_json,
     revisedPrompt: image.revised_prompt || null,
-    usedReferenceImages: !!referenceImages,
-    referenceSource: referenceImages?.[0]?.source || null,
-    referenceCount: referenceImages?.length || 0
+    usedReferenceImages,
+    referenceSource,
+    referenceCount: usedReferenceImages ? effectiveReferenceCount : 0
   };
 }
 
+function formatReferenceDescriptions(references) {
+  return references
+    .map(
+      (ref, idx) =>
+        `- Reference ${idx + 1} (${ref.source || 'unknown'}): ${ref.description || 'Portrait photo downloaded for likeness'}`
+    )
+    .join('\n');
+}
+
+function buildStylePrompt(name, referenceDescriptions) {
+  return `Use the first attachment as the Judge Judy style reference. Use every remaining attachment for likeness information about ${name}. Create a brand new caricature of ${name} that keeps the Judge Judy illustration style: bold graphic outlines, limited color palette, comic book shading, expressive courtroom drama energy, and a clean background. Maintain ${name}'s recognisable features with tasteful exaggeration.\n\nReference details:\n${referenceDescriptions}`;
+}
+
 async function generateTextOnlyCaricature(name) {
-  const prompt = `Create a realistic caricature of ${name}. Make it recognizable with subtle exaggeration of distinctive features. Professional quality, clean background, suitable for web display.`;
+  const prompt = `Create a bold, Judge Judy-style caricature of ${name}. Make it recognisable with tasteful exaggeration, bold graphic outlines, limited colors, and a clean background.`;
 
   return await openaiClient.images.generate({
     model: process.env.OPENAI_IMAGE_MODEL || 'dall-e-3',
